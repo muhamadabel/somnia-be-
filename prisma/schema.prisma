@@ -1,0 +1,315 @@
+// Dream Journal Analyzer — logical data model (see docs/08-database-design.md)
+// SQLite is used for zero-setup local/demo deployments. The schema is
+// deliberately portable: switching to PostgreSQL only requires changing
+// the datasource provider and url.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  fullName     String
+  email        String    @unique
+  passwordHash String
+  avatarPath   String?
+  role         String    @default("user") // user | admin
+  status       String    @default("active") // active | suspended
+  timezone     String    @default("Asia/Jakarta")
+  language     String    @default("en")
+  theme        String    @default("dark") // dark | light
+  anonName     String // pseudonym shown in the community (privacy by design)
+  onboardedAt  DateTime?
+  // notification / reminder preferences
+  reminderEnabled Boolean @default(true)
+  reminderTime    String  @default("07:00")
+  weeklyDigest    Boolean @default(true)
+  communityAlerts Boolean @default(true)
+  // privacy preferences
+  aiMemoryEnabled Boolean @default(true) // allow AI companion to use dream history
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions       Session[]
+  dreams         Dream[]
+  conversations  Conversation[]
+  reports        Report[]
+  posts          CommunityPost[]
+  comments       Comment[]
+  reactions      Reaction[]
+  notifications  Notification[]
+  bookmarks      SymbolBookmark[]
+  contentReports ContentReport[]
+  auditLogs      AuditLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Dream {
+  id            String    @id @default(cuid())
+  userId        String
+  title         String?
+  description   String
+  notes         String?
+  mood          String? // mood after waking: great | good | neutral | low | bad
+  sleepDuration Float? // hours
+  dreamDate     DateTime // the night the dream happened (calendar axis)
+  isDraft       Boolean   @default(false)
+  imagePath     String? // optional user attachment
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  archivedAt    DateTime?
+  deletedAt     DateTime? // soft delete (docs/06 business rule)
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analyses       Analysis[]
+  visualizations Visualization[]
+  emotions       DreamEmotion[]
+  symbols        DreamSymbol[]
+  post           CommunityPost?
+
+  @@index([userId, dreamDate])
+  @@index([userId, deletedAt, archivedAt])
+}
+
+// AI-generated insight. Never overwrites the dream; each regeneration
+// creates a new version (docs/06 — analyses stay versionable).
+model Analysis {
+  id                 String   @id @default(cuid())
+  dreamId            String
+  version            Int
+  summary            String
+  reflection         String
+  dominantEmotion    String
+  emotionIntensity   Int // 0..100
+  themes             String // JSON string[]
+  recommendations    String // JSON string[]
+  suggestedQuestions String // JSON string[]
+  patternNote        String? // explainability: why patterns were flagged
+  emotionsJson       String // JSON snapshot [{name, intensity, why}]
+  symbolsJson        String // JSON snapshot [{name, confidence, why}]
+  confidence         Float // 0..1
+  provider           String // "anthropic" | "local-demo"
+  model              String
+  generatedAt        DateTime @default(now())
+
+  dream Dream @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+
+  @@unique([dreamId, version])
+  @@index([dreamId])
+}
+
+model Emotion {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  tone        String // positive | negative | neutral
+  color       String // hex used in charts / calendar dots
+  description String
+  dreams      DreamEmotion[]
+}
+
+model DreamEmotion {
+  dreamId   String
+  emotionId String
+  intensity Int // 0..100
+  dream     Dream   @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+  emotion   Emotion @relation(fields: [emotionId], references: [id], onDelete: Cascade)
+
+  @@id([dreamId, emotionId])
+  @@index([emotionId])
+}
+
+model Symbol {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  slug            String           @unique
+  category        String // Nature | Creature | Action | Place | Object | People | Event
+  description     String
+  interpretation  String
+  relatedEmotions String // JSON string[]
+  dreams          DreamSymbol[]
+  bookmarks       SymbolBookmark[]
+}
+
+model DreamSymbol {
+  dreamId    String
+  symbolId   String
+  confidence Int // 0..100
+  dream      Dream  @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+  symbol     Symbol @relation(fields: [symbolId], references: [id], onDelete: Cascade)
+
+  @@id([dreamId, symbolId])
+  @@index([symbolId])
+}
+
+model SymbolBookmark {
+  userId    String
+  symbolId  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol    Symbol   @relation(fields: [symbolId], references: [id], onDelete: Cascade)
+
+  @@id([userId, symbolId])
+}
+
+model Visualization {
+  id        String    @id @default(cuid())
+  dreamId   String
+  imagePath String
+  prompt    String
+  provider  String // "procedural-art" | future external providers
+  seed      Int
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  dream Dream @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+
+  @@index([dreamId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           String // user | assistant
+  content        String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  userId      String
+  period      String // weekly | monthly | yearly
+  periodStart DateTime
+  periodEnd   DateTime
+  title       String
+  content     String // JSON: stats, trends, symbols, observations, reflection
+  provider    String
+  generatedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, period])
+}
+
+// A community post stores an explicit snapshot of the shared dream —
+// editing/deleting the private dream never silently changes what was
+// consciously published (docs/02 rule 4).
+model CommunityPost {
+  id        String    @id @default(cuid())
+  userId    String
+  dreamId   String?   @unique
+  title     String
+  content   String
+  meta      String // JSON: {emotions:[{name,color}], symbols:[], mood}
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dream     Dream?          @relation(fields: [dreamId], references: [id], onDelete: SetNull)
+  comments  Comment[]
+  reactions Reaction[]
+  reports   ContentReport[]
+
+  @@index([createdAt])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  postId    String
+  userId    String
+  content   String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  post    CommunityPost   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports ContentReport[]
+
+  @@index([postId])
+}
+
+model Reaction {
+  id     String @id @default(cuid())
+  postId String
+  userId String
+  type   String // heart | hug | sparkle | insight
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, type])
+  @@index([postId])
+}
+
+model ContentReport {
+  id         String   @id @default(cuid())
+  postId     String?
+  commentId  String?
+  reporterId String
+  reason     String
+  status     String   @default("open") // open | resolved | dismissed
+  createdAt  DateTime @default(now())
+
+  post     CommunityPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment  Comment?       @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reporter User           @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // welcome | report | comment | reaction | system
+  title     String
+  message   String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+// Security-sensitive events only — never contains dream content (docs/10).
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  event     String
+  detail    String?
+  ip        String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([event, createdAt])
+}

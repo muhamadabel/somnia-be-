@@ -51,9 +51,19 @@ docs/               dokumen spesifikasi lengkap (00–16)
 
 ---
 
-## 🟢 Setup Database di Supabase
+## ▶️ Menjalankan / deploy di server sendiri
 
-Aplikasi ini defaultnya pakai SQLite (untuk demo). Untuk produksi, arahkan ke **PostgreSQL Supabase**. Cukup **2 baris** yang diubah di schema + env — model datanya sudah kompatibel PostgreSQL.
+Untuk **menjalankan** aplikasi (di laptop/komputer yang dijadikan server), pakai repo lengkap `somnia-fe` — ada **panduan langkah demi langkah** di sana:
+
+👉 **https://github.com/muhamadabel/somnia-fe/blob/main/DEPLOY.md**
+
+Aplikasinya **mandiri** (SQLite + penyimpanan lokal + AI gratis), jadi di server dengan disk permanen tinggal `npm install → npm run setup → npm run build → npm start`. **Tidak wajib** pakai Supabase/PostgreSQL — SQLite sudah cukup untuk server sendiri.
+
+---
+
+## 🟢 (Opsional) Pakai PostgreSQL / Supabase
+
+SQLite sudah cukup untuk 1 server. Bagian ini **hanya kalau** ingin database "server-grade" (PostgreSQL lokal atau **Supabase**). Cukup **2 baris** yang diubah di schema + env — model datanya sudah kompatibel PostgreSQL.
 
 ### 1. Buat project Supabase
 - Masuk ke https://supabase.com → **New project**. Catat **Database Password** yang kamu buat.

@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
@@ -6,6 +6,18 @@ import type { User } from "@prisma/client";
 
 const COOKIE_NAME = "djs_session";
 const SESSION_DAYS = 30;
+
+/**
+ * Read the session token. A separate cross-origin SPA sends it as
+ * `Authorization: Bearer <token>`; the same-origin app uses the cookie.
+ * Bearer takes precedence so the token-based frontend works anywhere.
+ */
+async function getSessionToken(): Promise<string | null> {
+  const auth = (await headers()).get("authorization");
+  if (auth && /^bearer /i.test(auth)) return auth.slice(7).trim() || null;
+  const jar = await cookies();
+  return jar.get(COOKIE_NAME)?.value ?? null;
+}
 
 // ── Session lifecycle ──────────────────────────────────────────────────
 
@@ -26,21 +38,18 @@ export async function createSession(userId: string, userAgent?: string | null) {
 }
 
 export async function destroySession() {
+  const token = await getSessionToken();
+  if (token) await db.session.deleteMany({ where: { token } });
   const jar = await cookies();
-  const token = jar.get(COOKIE_NAME)?.value;
-  if (token) {
-    await db.session.deleteMany({ where: { token } });
-    jar.delete(COOKIE_NAME);
-  }
+  if (jar.get(COOKIE_NAME)) jar.delete(COOKIE_NAME);
 }
 
 /**
- * Resolve the current user from the session cookie.
+ * Resolve the current user from the session token (Bearer header or cookie).
  * Cached per-request so layouts/pages/routes can all call it freely.
  */
 export const getCurrentUser = cache(async (): Promise<User | null> => {
-  const jar = await cookies();
-  const token = jar.get(COOKIE_NAME)?.value;
+  const token = await getSessionToken();
   if (!token) return null;
 
   const session = await db.session.findUnique({

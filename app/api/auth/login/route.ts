@@ -19,11 +19,12 @@ export const POST = handle(async (req: Request) => {
     return fail(403, "Akun ini telah ditangguhkan. Hubungi dukungan jika kamu merasa ini keliru.");
   }
 
-  await createSession(user.id, req.headers.get("user-agent"));
+  const token = await createSession(user.id, req.headers.get("user-agent"));
   await audit("auth.login", user.id, undefined, clientIp(req));
 
+  // `token` lets a separate cross-origin SPA authenticate via Bearer header.
   return ok(
-    { id: user.id, fullName: user.fullName, email: user.email, onboarded: !!user.onboardedAt },
-    "Signed in."
+    { token, id: user.id, fullName: user.fullName, email: user.email, onboarded: !!user.onboardedAt },
+    "Berhasil masuk."
   );
 });

@@ -1,11 +1,14 @@
-# 🌙 Somnia — Backend (Lapisan Server)
+# 🌙 Somnia — Backend API
 
-Lapisan **backend** dari aplikasi **Somnia — Penganalisis Jurnal Mimpi**: API, business logic, database, dan subsistem AI.
+**REST API standalone** untuk aplikasi **Somnia — Penganalisis Jurnal Mimpi**: business logic, database, autentikasi, dan subsistem AI. Dibangun dengan Next.js Route Handlers.
 
-> ℹ️ **Penting:** Somnia dibangun sebagai **satu aplikasi Next.js utuh** (frontend + backend jadi satu). Repo ini berisi **kode sisi-server saja** yang diambil dari aplikasi tersebut.
->
-> - **Aplikasi lengkap yang bisa dijalankan (frontend + backend):** https://github.com/muhamadabel/somnia-fe
-> - Kode di repo ini **tidak berjalan sendiri** — ia adalah bagian server dari app Next.js di repo `somnia-fe`. Untuk menjalankan, pakai `somnia-fe`.
+Repo ini **berjalan sendiri** sebagai backend, dan dipanggil oleh frontend terpisah (repo [`somnia-fe`](https://github.com/muhamadabel/somnia-fe)) lewat HTTP.
+
+- 🔑 **Auth:** token — `POST /api/auth/login` mengembalikan `token`; kirim di header `Authorization: Bearer <token>` pada request berikutnya.
+- 🌐 **CORS:** set env `FRONTEND_URL` ke domain frontend agar diizinkan (mis. `https://somnia.hallojanu.xyz`).
+- 📦 **Menjalankan:** `npm install && npm run setup && npm run build && npm start` (default port 3000). Sama seperti [DEPLOY.md di somnia-fe](https://github.com/muhamadabel/somnia-fe/blob/main/DEPLOY.md), plus set `FRONTEND_URL`.
+
+> Arsitektur: frontend & backend adalah **dua aplikasi terpisah**. Backend ini menyajikan `/api/*`; frontend `somnia-fe` menyajikan tampilan dan memanggil API ini via `NEXT_PUBLIC_API_URL`.
 
 ---
 
@@ -157,9 +160,14 @@ Rujukan: [`docs/06-backend-spec.md`](docs/06-backend-spec.md) ·
 |----------|-------|------------|
 | `DATABASE_URL` | ✅ | SQLite `file:./dev.db` (lokal) **atau** Postgres pooled Supabase |
 | `DIRECT_URL` | Supabase | Koneksi direct Supabase (untuk migrasi Prisma) |
-| `SESSION_SECRET` | ✅ | String acak untuk keamanan sesi |
+| `SESSION_SECRET` | ✅ | String acak untuk keamanan sesi/token |
+| `FRONTEND_URL` | ✅ (produksi) | Domain frontend untuk izin CORS, mis. `https://somnia.hallojanu.xyz`. Kosong = izinkan semua (`*`, untuk dev) |
 | `ANTHROPIC_API_KEY` | — | Kosong = AI gratis (Pollinations). Diisi = pakai Claude |
 | `AI_MODE` | — | `local` = paksa mesin offline (tanpa internet) |
+
+## 🔌 Daftar endpoint (ringkas)
+
+`auth/` register · login · logout · session — `dreams` (+ `[id]`, `analysis`, `visualization`, `archive`, `image`) · `dashboard` · `trends` · `gallery` · `calendar` (via `dreams?from=&to=`) · `symbols` (+ `[id]`, `[id]/bookmark`) · `reports` (+ `[id]`) · `conversations` (+ messages) · `companion/suggestions` · `community/posts` (+ komentar/reaksi/laporan) · `notifications` · `user/profile` · `admin/overview` · `files/[...]` · `health`
 
 ---
 

@@ -31,8 +31,8 @@ export const POST = handle(async (req: Request) => {
     },
   });
 
-  await createSession(user.id, req.headers.get("user-agent"));
+  const token = await createSession(user.id, req.headers.get("user-agent"));
   await audit("user.registered", user.id, undefined, clientIp(req));
 
-  return ok({ id: user.id, fullName: user.fullName, email: user.email }, "Account created.");
+  return ok({ token, id: user.id, fullName: user.fullName, email: user.email }, "Akun dibuat.");
 });

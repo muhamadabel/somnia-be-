@@ -25,13 +25,25 @@ export const GET = handle(async (req: Request) => {
       take: limit,
       include: {
         user: { select: { anonName: true } },
-        _count: { select: { comments: { where: { deletedAt: null } }, reactions: true } },
-        reactions: { where: { userId: user.id }, select: { type: true } },
+        _count: { select: { comments: { where: { deletedAt: null } } } },
+        reactions: { select: { type: true, userId: true } },
       },
     }),
   ]);
 
-  return ok(posts, "Feed retrieved.", pageMeta(page, limit, total));
+  // Shape reactions for the client: per-type counts + which the user made.
+  const shaped = posts.map((p) => {
+    const reactionCounts: Record<string, number> = {};
+    const myReactions: string[] = [];
+    for (const r of p.reactions) {
+      reactionCounts[r.type] = (reactionCounts[r.type] ?? 0) + 1;
+      if (r.userId === user.id) myReactions.push(r.type);
+    }
+    const { reactions: _reactions, ...rest } = p;
+    return { ...rest, reactionCounts, myReactions, commentCount: p._count.comments };
+  });
+
+  return ok(shaped, "Feed retrieved.", pageMeta(page, limit, total));
 });
 
 // Publish a dream to the community — an explicit snapshot (docs/02 rule 4).

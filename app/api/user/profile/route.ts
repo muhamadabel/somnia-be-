@@ -6,13 +6,14 @@ import { changePasswordSchema, preferencesSchema, profileSchema } from "@/lib/va
 
 export const GET = handle(async () => {
   const user = await requireUser();
-  const [dreamCount, analysisCount, postCount] = await Promise.all([
+  const [dreamCount, analysisCount, postCount, artCount] = await Promise.all([
     db.dream.count({ where: { userId: user.id, deletedAt: null, isDraft: false } }),
     db.analysis.count({ where: { dream: { userId: user.id, deletedAt: null } } }),
     db.communityPost.count({ where: { userId: user.id, deletedAt: null } }),
+    db.visualization.count({ where: { deletedAt: null, dream: { userId: user.id } } }),
   ]);
   const { passwordHash: _ph, ...safe } = user;
-  return ok({ ...safe, stats: { dreamCount, analysisCount, postCount } });
+  return ok({ ...safe, stats: { dreamCount, analysisCount, postCount, artCount } });
 });
 
 export const PATCH = handle(async (req: Request) => {

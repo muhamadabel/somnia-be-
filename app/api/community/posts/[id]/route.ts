@@ -16,12 +16,20 @@ export const GET = handle(async (_req: Request, { params }: Ctx) => {
         orderBy: { createdAt: "asc" },
         include: { user: { select: { anonName: true } } },
       },
-      reactions: true,
-      _count: { select: { comments: { where: { deletedAt: null } } } },
+      reactions: { select: { type: true, userId: true } },
     },
   });
   if (!post) throw notFound("Post");
-  return ok({ ...post, mine: post.userId === user.id });
+
+  const reactionCounts: Record<string, number> = {};
+  const myReactions: string[] = [];
+  for (const r of post.reactions) {
+    reactionCounts[r.type] = (reactionCounts[r.type] ?? 0) + 1;
+    if (r.userId === user.id) myReactions.push(r.type);
+  }
+  const comments = post.comments.map((c) => ({ ...c, mine: c.userId === user.id || user.role === "admin" }));
+  const { reactions: _r, ...rest } = post;
+  return ok({ ...rest, comments, reactionCounts, myReactions, mine: post.userId === user.id });
 });
 
 export const DELETE = handle(async (_req: Request, { params }: Ctx) => {
